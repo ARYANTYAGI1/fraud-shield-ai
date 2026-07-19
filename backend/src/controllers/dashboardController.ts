@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import mongoose from 'mongoose';
 import { AuthenticatedRequest } from '../middlewares/authMiddleware';
 import Scan from '../models/Scan';
 import AuditLog from '../models/AuditLog';
@@ -8,17 +9,18 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
   const userId = req.user?.id;
 
   try {
-    if (!userId) {
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
+    const userObjectId = new mongoose.Types.ObjectId(userId);
 
     // Total Scans
     const totalScans = await Scan.countDocuments({ userId });
 
     // Count by category
     const categoryCounts = await Scan.aggregate([
-      { $match: { userId: { $toObjectId: userId } } },
+      { $match: { userId: userObjectId } },
       { $group: { _id: '$result.category', count: { $sum: 1 } } },
     ]);
 
@@ -48,7 +50,7 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
     const trendData = await Scan.aggregate([
       {
         $match: {
-          userId: { $toObjectId: userId },
+          userId: userObjectId,
           createdAt: { $gte: sevenDaysAgo },
         },
       },
